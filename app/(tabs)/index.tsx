@@ -1,11 +1,40 @@
+import { Buffer } from "buffer";
+
 import { Image, StyleSheet, Platform } from 'react-native';
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import {  Text, View, SafeAreaView, Button } from 'react-native';
+// import { createSmartAccountWithSessionKey } from '@/createSmartAcctount';
+import {getPassKeyValidator} from '@/passKeyValidator'
+import { createSmartAccountWithSessionKey } from "../../createSmartAcctount";
+
+
+
+
+// console.warn(KernelImplToVersionMap)
+
 
 export default function HomeScreen() {
+
+window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define error
+
+
+
+
+
+  async function handleBTN() {
+    console.log('wporking ')
+    let passVal = await getPassKeyValidator()
+    
+    console.log('pass key validatoe ', passVal)
+    console.log('pass key validatoe ', passVal.passkeyValidator, 'address')
+    let session = await createSmartAccountWithSessionKey(passVal.passkeyValidator)
+    console.warn('this is seeion ', session)
+    
+  }
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -46,6 +75,9 @@ export default function HomeScreen() {
           <ThemedText type="defaultSemiBold">app-example</ThemedText>.
         </ThemedText>
       </ThemedView>
+
+
+      <Button onPress={handleBTN} title="Click Me" color="#841584" />
     </ParallaxScrollView>
   );
 }

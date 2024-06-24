@@ -1,5 +1,4 @@
 
-"use client"
 
 import {
     createKernelAccount,
@@ -14,22 +13,30 @@ import {privateKeyToAccount, generatePrivateKey} from 'viem/accounts'
 import { Chain, createPublicClient, http } from "viem"
 import { KERNEL_V3_1 } from "@zerodev/sdk/constants"
 
+import {sepolia} from 'viem/chains'
+
+
 import { toECDSASigner } from "@zerodev/permissions/signers"
 import { toSudoPolicy } from "@zerodev/permissions/policies"
+import { serializePermissionAccount } from "@zerodev/permissions"
 
 
 
 
-
-
-export async function createSmartAccountWithSessionKey (publicClientRPC:string, passkeyValidator:any, CHAIN:Chain, BUNDLER_URL:string, PAYMASTER_URL:string) {
+export async function createSmartAccountWithSessionKey (passkeyValidator:any) {
+    let BUNDLER_URL = 'https://rpc.zerodev.app/api/v2/bundler/fecf8828-834c-48e2-8582-aa03c6a91ffd'
+    let PAYMASTER_URL = 'https://rpc.zerodev.app/api/v2/paymaster/fecf8828-834c-48e2-8582-aa03c6a91ffd'
     const publicClient = createPublicClient({
-        transport: http(publicClientRPC)
+        transport: http('https://eth-sepolia.g.alchemy.com/v2/jogIMyqoY-cGnrTllPVfyIekWM2A3Z98')
     })
 
+
+    
     let sessionPrivateKey = generatePrivateKey()
     
    let sessionKeySigner= privateKeyToAccount(sessionPrivateKey)
+
+
     const ecdsaSigner = await toECDSASigner({
         signer: sessionKeySigner
     })
@@ -56,14 +63,14 @@ export async function createSmartAccountWithSessionKey (publicClientRPC:string, 
 
     const kernelClient = createKernelAccountClient({
         account: sessionKeyAccount,
-        chain: CHAIN,
+        chain: sepolia,
         bundlerTransport: http(BUNDLER_URL),
         entryPoint: ENTRYPOINT_ADDRESS_V07,
         middleware: {
             sponsorUserOperation: async ({ userOperation }) => {
                 const zeroDevPaymaster = await createZeroDevPaymasterClient(
                     {
-                        chain: CHAIN,
+                        chain: sepolia,
                         transport: http(PAYMASTER_URL),
                         entryPoint: ENTRYPOINT_ADDRESS_V07
                     }
@@ -76,10 +83,15 @@ export async function createSmartAccountWithSessionKey (publicClientRPC:string, 
         }
     })
 
+     // Include the private key when you serialize the session key
+  let seri =  await serializePermissionAccount(sessionKeyAccount, sessionPrivateKey)
+
 
     return {
+        seri,
         kernelClient,
-        sessionKeyAccount
+        sessionKeyAccount,
+        sessionPrivateKey
     }
 
    
