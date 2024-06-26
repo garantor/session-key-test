@@ -2,16 +2,18 @@ import { Buffer } from "buffer";
 
 import { Image, StyleSheet, Platform } from 'react-native';
 
-import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import {  Text, View, SafeAreaView, Button } from 'react-native';
+import {  Button } from 'react-native';
 // import { createSmartAccountWithSessionKey } from '@/createSmartAcctount';
-import {getPassKeyValidator} from '@/passKeyValidator'
-import { createAccountClientWithPassKey, createSmartAccountWithSessionKey } from "../../createSmartAcctount";
-import { loginUserWithPassKey } from "../../passKeyValidator";
-import React from "react";
+import {createRequestClient, createSessionKeyAccount, createValidator, registerNewPassKey, sendUserOperationPayment} from '../../passkey/passKeyValidator'
+import { createAccountClientWithPassKey, createSmartAccountWithSessionKey } from "../../passkey/createSmartAcctount";
+import { createKernelSmartAccount, loginUserWithPassKey } from "../../passkey/passKeyValidator";
+import React, { useEffect } from "react";
+
+import {paymentWithSession, paymentWithPassKey}  from '../../passkey/blockPayments'
+import { createPublicClient, http } from "viem";
 
 
 
@@ -21,22 +23,36 @@ import React from "react";
 
 export default function HomeScreen() {
   const [loading, setLoading] = React.useState<boolean>(false)
+  const [disableTransaction, setDisableTransaction] = React.useState<boolean>(true)
+  const [passKeyValidator, setPassKeyValidator] = React.useState<any | undefined>(undefined)
+  const [passKeyInstance, setPassKeyInstance] = React.useState<any | undefined>(undefined)
+  const [smartAccountInstance, setSmartAccountInstance] = React.useState<any | undefined>(undefined)
+  const [requestClient, setRequestClient] = React.useState<any | undefined>(undefined)
+  const [publicClient, setPublicClient] = React.useState<any | undefined>(undefined)
+  const [sessionAccount, setSessionAccount] = React.useState<any | undefined>(undefined)
+  const [sessionClient, setSessionClient] = React.useState<any | undefined>(undefined)
 
 window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define error
 
+  useEffect(() => {
+    let clientInstance = createPublicClient({
+      transport: http('https://eth-sepolia.g.alchemy.com/v2/jogIMyqoY-cGnrTllPVfyIekWM2A3Z98')
+    })
 
+    setPublicClient(clientInstance)
+  }, [])
 
 
 
   async function handleBTN() {
     setLoading(true)
     console.log('wporking ')
-    let passVal = await getPassKeyValidator()
+    let passVal = await registerNewPassKey()
     
-    console.log('pass key validatoe ', passVal)
-    console.log('pass key validatoe ', passVal.passkeyValidator, 'address')
-    let session = await createSmartAccountWithSessionKey(passVal.passkeyValidator)
-    console.warn('this is seeion ', session)
+    // console.log('pass key validatoe ', passVal)
+    // console.log('pass key validatoe ', passVal.passkeyValidator, 'address')
+    // let session = await createSmartAccountWithSessionKey(passVal.passkeyValidator)
+    // console.warn('this is seeion ', session)
     setLoading(false)
 
     
@@ -50,13 +66,58 @@ window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define
 
     console.log('wporking login')
     let passVal = await loginUserWithPassKey()
+    setPassKeyInstance(passVal.webAuthnKey)
+
+    let pValidator = await createValidator(passVal.webAuthnKey, publicClient)
+    setPassKeyValidator(pValidator)
+
+    let kernelAccount = await createKernelSmartAccount(pValidator, publicClient)
+
+    console.log('kernalAccount ', kernelAccount)
+    setSmartAccountInstance(kernelAccount)
+
+    let requestClient = await createRequestClient(kernelAccount)
+    setRequestClient(requestClient)
     
     console.log('pass key validatoe ', passVal)
-    console.log('pass key validatoe ', passVal.passkeyValidator, 'address')
-    let session = await createSmartAccountWithSessionKey(passVal.passkeyValidator)
-    console.warn('this is seeion ', session)
+    // console.log('pass key validatoe ', passVal.passkeyValidator, 'address')
+    // let session = await createSmartAccountWithSessionKey(passVal.passkeyValidator)
+    // console.warn('this is seeion ', session)
     setLoading(false)
 
+    
+  }
+
+
+  async function handleSendPaymentPass() {
+    console.log('handleSendPaymentPass')
+    console.log('this is validator ', passKeyValidator)
+    let paymentRequest = await sendUserOperationPayment(requestClient, smartAccountInstance)
+    console.log('this pass account ', paymentRequest)
+    
+  }
+
+
+
+  async function handleCreateSession() {
+    console.log('createSession')
+    let sessionCreated = await createSessionKeyAccount(passKeyValidator, publicClient)
+    setSessionAccount(sessionCreated)
+    console.log('this is the seesion ', sessionCreated)
+
+
+    let requestClient2 = await createRequestClient(sessionCreated)
+    setSessionClient(requestClient2)
+
+    console.log('session created ', requestClient2)
+    
+  }
+
+
+  async function handleSendPaymentSession() {
+    console.log('handleSendPaymentSession')
+    let paymentRequest = await sendUserOperationPayment(sessionClient, sessionAccount)
+    console.log('this pass account ', paymentRequest)
     
   }
 
@@ -82,6 +143,22 @@ window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define
         </ThemedText>
         <ThemedText>
         <Button disabled={loading} onPress={handleLogin} title="Login With Pass Key" color="#841584" />
+
+        </ThemedText>
+
+        <ThemedText>
+        <Button  onPress={handleSendPaymentPass} title="Send Payment with PassKey" color="#841584" />
+
+        </ThemedText>
+
+        <ThemedText>
+        <Button  onPress={handleSendPaymentSession} title="Send Payment With Session Key" color="#841584" />
+
+        </ThemedText>
+
+
+        <ThemedText>
+        <Button  onPress={handleCreateSession} title="Create Session" color="#841584" />
 
         </ThemedText>
       
