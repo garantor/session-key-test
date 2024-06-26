@@ -17,24 +17,16 @@ import {
 import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
 import { ENTRYPOINT_ADDRESS_V07 } from "permissionless";
 import {
-  createPublicClient,
   http,
-  parseAbi,
   encodeFunctionData,
-  zeroAddress,
   PublicClient,
   parseUnits,
+  Chain,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 
-let PASSKEY_SERVER_URL =
-  "https://passkeys.zerodev.app/api/v3/fecf8828-834c-48e2-8582-aa03c6a91ffd";
-let BUNDLER_URL =
-  "https://rpc.zerodev.app/api/v2/bundler/fecf8828-834c-48e2-8582-aa03c6a91ffd";
-let PAYMASTER_URL =
-  "https://rpc.zerodev.app/api/v2/paymaster/fecf8828-834c-48e2-8582-aa03c6a91ffd";
-let defaultChain = sepolia;
+
 
 export const transferAbi = [
   {
@@ -49,10 +41,10 @@ export const transferAbi = [
   },
 ] as const;
 
-export async function registerNewPassKey() {
+export async function registerNewPassKey(passKeyUrl:string) {
   const webAuthnKey = await toWebAuthnKey({
     passkeyName: "ITL-passKey-Demo",
-    passkeyServerUrl: PASSKEY_SERVER_URL,
+    passkeyServerUrl: passKeyUrl,
     mode: WebAuthnMode.Register,
   });
 
@@ -60,11 +52,11 @@ export async function registerNewPassKey() {
 }
 
 // "0x90973004ceeb4cdcdd8182c765118009c07051c2bee8fc45bfb026a3af543ab3"
-export async function loginUserWithPassKey() {
+export async function loginUserWithPassKey(passKeyURL:string) {
   // just create a simple user login with their passkey
   const webAuthnKey = await toWebAuthnKey({
     passkeyName: "ITL-passKey-Demo",
-    passkeyServerUrl: PASSKEY_SERVER_URL,
+    passkeyServerUrl: passKeyURL,
     mode: WebAuthnMode.Login,
   });
 
@@ -75,12 +67,13 @@ export async function loginUserWithPassKey() {
 
 export async function createValidator(
   webAuthInstance: WebAuthnKey,
-  pubClientInstance: PublicClient
+  pubClientInstance: PublicClient,
+  passKeyURL:string
 ) {
   // this create a passkey validator
   const passkeyValidator = await toPasskeyValidator(pubClientInstance, {
     webAuthnKey: webAuthInstance,
-    passkeyServerUrl: PASSKEY_SERVER_URL,
+    passkeyServerUrl: passKeyURL,
     entryPoint: ENTRYPOINT_ADDRESS_V07,
     kernelVersion: KERNEL_V3_1,
   });
@@ -109,7 +102,7 @@ export async function createKernelSmartAccount(
   return account;
 }
 
-export async function createRequestClient(accountAndSigner: any) {
+export async function createRequestClient(accountAndSigner: any, bundlerRPC:string,paymasterRPC:string, chain:Chain) {
   // ------------------------------------------------------------------------------
   // this handle blockchain request, sending request to the blockchain
   const kernelClient = createKernelAccountClient({
@@ -117,17 +110,17 @@ export async function createRequestClient(accountAndSigner: any) {
     entryPoint: ENTRYPOINT_ADDRESS_V07,
 
     // Replace with your chain
-    chain: defaultChain,
+    chain: chain,
 
     // Replace with your bundler RPC.
     // For ZeroDev, you can find the RPC on your dashboard.
-    bundlerTransport: http(BUNDLER_URL),
+    bundlerTransport: http(bundlerRPC),
 
     middleware: {
       sponsorUserOperation: async ({ userOperation }) => {
         const zeroDevPaymaster = await createZeroDevPaymasterClient({
-          chain: defaultChain,
-          transport: http(PAYMASTER_URL),
+          chain: chain,
+          transport: http(paymasterRPC),
           entryPoint: ENTRYPOINT_ADDRESS_V07,
         });
         return zeroDevPaymaster.sponsorUserOperation({

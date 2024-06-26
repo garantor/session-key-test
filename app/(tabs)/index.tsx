@@ -14,12 +14,21 @@ import React, { useEffect } from "react";
 
 import {paymentWithSession, paymentWithPassKey}  from '../../passkey/blockPayments'
 import { createPublicClient, http } from "viem";
+import { sepolia } from "viem/chains";
 
 
 
+let PASSKEY_SERVER_URL =
+  "https://passkeys.zerodev.app/api/v3/fecf8828-834c-48e2-8582-aa03c6a91ffd";
+let BUNDLER_URL =
+  "https://rpc.zerodev.app/api/v2/bundler/fecf8828-834c-48e2-8582-aa03c6a91ffd";
+let PAYMASTER_URL =
+  "https://rpc.zerodev.app/api/v2/paymaster/fecf8828-834c-48e2-8582-aa03c6a91ffd";
+let defaultChain = sepolia;
 
-// console.warn(KernelImplToVersionMap)
-
+let clientInstance = createPublicClient({
+  transport: http('https://eth-sepolia.g.alchemy.com/v2/jogIMyqoY-cGnrTllPVfyIekWM2A3Z98')
+})
 
 export default function HomeScreen() {
   const [loading, setLoading] = React.useState<boolean>(false)
@@ -28,19 +37,11 @@ export default function HomeScreen() {
   const [passKeyInstance, setPassKeyInstance] = React.useState<any | undefined>(undefined)
   const [smartAccountInstance, setSmartAccountInstance] = React.useState<any | undefined>(undefined)
   const [requestClient, setRequestClient] = React.useState<any | undefined>(undefined)
-  const [publicClient, setPublicClient] = React.useState<any | undefined>(undefined)
+  const [publicClient, setPublicClient] = React.useState<any>(clientInstance)
   const [sessionAccount, setSessionAccount] = React.useState<any | undefined>(undefined)
   const [sessionClient, setSessionClient] = React.useState<any | undefined>(undefined)
 
 window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define error
-
-  useEffect(() => {
-    let clientInstance = createPublicClient({
-      transport: http('https://eth-sepolia.g.alchemy.com/v2/jogIMyqoY-cGnrTllPVfyIekWM2A3Z98')
-    })
-
-    setPublicClient(clientInstance)
-  }, [])
 
 
 
@@ -65,10 +66,10 @@ window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define
     // console.warn('det ', det)
 
     console.log('wporking login')
-    let passVal = await loginUserWithPassKey()
+    let passVal = await loginUserWithPassKey(PASSKEY_SERVER_URL)
     setPassKeyInstance(passVal.webAuthnKey)
 
-    let pValidator = await createValidator(passVal.webAuthnKey, publicClient)
+    let pValidator = await createValidator(passVal.webAuthnKey, publicClient, PASSKEY_SERVER_URL)
     setPassKeyValidator(pValidator)
 
     let kernelAccount = await createKernelSmartAccount(pValidator, publicClient)
@@ -76,7 +77,7 @@ window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define
     console.log('kernalAccount ', kernelAccount)
     setSmartAccountInstance(kernelAccount)
 
-    let requestClient = await createRequestClient(kernelAccount)
+    let requestClient = await createRequestClient(kernelAccount, BUNDLER_URL, PAYMASTER_URL, defaultChain)
     setRequestClient(requestClient)
     
     console.log('pass key validatoe ', passVal)
@@ -106,7 +107,7 @@ window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define
     console.log('this is the seesion ', sessionCreated)
 
 
-    let requestClient2 = await createRequestClient(sessionCreated)
+    let requestClient2 = await createRequestClient(sessionCreated, BUNDLER_URL, PAYMASTER_URL, defaultChain)
     setSessionClient(requestClient2)
 
     console.log('session created ', requestClient2)
@@ -131,10 +132,9 @@ window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define
           style={styles.reactLogo}
         />
       }>
-      {/* <ThemedView style={styles.titleContainer}>
+      <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-        </ThemedView> */}
+        </ThemedView>
    
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Pass key start Here</ThemedText>
@@ -172,9 +172,10 @@ window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define
 
 const styles = StyleSheet.create({
   titleContainer: {
-    flexDirection: 'row',
+    // flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom:10
   },
   stepContainer: {
     gap: 8,
