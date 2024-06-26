@@ -9,7 +9,7 @@ import { ThemedView } from '@/components/ThemedView';
 import {  Text, View, SafeAreaView, Button } from 'react-native';
 // import { createSmartAccountWithSessionKey } from '@/createSmartAcctount';
 import {getPassKeyValidator} from '@/passKeyValidator'
-import { createSmartAccountWithSessionKey } from "../../createSmartAcctount";
+import { createAccountClientWithPassKey, createSmartAccountWithSessionKey } from "../../createSmartAcctount";
 import { loginUserWithPassKey } from "../../passKeyValidator";
 import React from "react";
 
@@ -45,14 +45,16 @@ window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define
 
   async function handleLogin() {
     setLoading(true)
+    // let det = await createAccountClientWithPassKey()
+    // console.warn('det ', det)
 
     console.log('wporking login')
     let passVal = await loginUserWithPassKey()
     
     console.log('pass key validatoe ', passVal)
     console.log('pass key validatoe ', passVal.passkeyValidator, 'address')
-    // let session = await createSmartAccountWithSessionKey(passVal.passkeyValidator)
-    // console.warn('this is seeion ', session)
+    let session = await createSmartAccountWithSessionKey(passVal.passkeyValidator)
+    console.warn('this is seeion ', session)
     setLoading(false)
 
     
