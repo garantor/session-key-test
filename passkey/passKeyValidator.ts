@@ -22,8 +22,9 @@ import {
   PublicClient,
   parseUnits,
   Chain,
+  zeroAddress,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 
 
@@ -64,6 +65,9 @@ export async function loginUserWithPassKey(passKeyURL:string) {
     webAuthnKey,
   };
 }
+
+
+
 
 export async function createValidator(
   webAuthInstance: WebAuthnKey,
@@ -129,7 +133,7 @@ export async function createRequestClient(accountAndSigner: any, bundlerRPC:stri
         });
       },
     },
-  });
+  })
 
   return kernelClient;
 }
@@ -145,9 +149,9 @@ export async function sendUserOperationPayment(
   const userOpHash = await kernelClient.sendUserOperation({
     userOperation: {
       callData: await kernelAccount.encodeCallData({
-        to: "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
+        to: zeroAddress,
         value: BigInt(0),
-        data: transactionAmt,
+        data: '0x',
       }),
     },
   });
@@ -158,7 +162,7 @@ export async function sendUserOperationPayment(
 }
 
 async function encodeTransaction() {
-  let amt = parseUnits("1", 6);
+  let amt = parseUnits("1.521", 6);
 
   let encoded = encodeFunctionData({
     abi: transferAbi,
@@ -171,7 +175,7 @@ async function encodeTransaction() {
 
 const sessionPrivateKey =
   "0x347b9a6820e9b7bbcec2b2b69ca3ab84d8bcccb990c79c10d8436f219333c53d";
-let sessionKeypair = privateKeyToAccount(sessionPrivateKey);
+let sessionKeypair = privateKeyToAccount(generatePrivateKey());
 
 export async function createSessionKeyAccount(passkeyValidator:any, publicClient:PublicClient) {
   // let sessionPubKey = sessionKeypair.address; // the public key
