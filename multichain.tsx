@@ -132,6 +132,7 @@ export async function createMultichainValidatorTwoChain(){
 
 
 export async function createMultiChainKernelAccountTWO(multiChainWebAuthnValidators: any[]) {
+    console.log('here ', multiChainWebAuthnValidators)
 
     const sepoliaKernelAccount = await createKernelAccount(clientInstance, {
         entryPoint: getEntryPoint(),

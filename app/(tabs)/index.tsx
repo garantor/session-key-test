@@ -13,13 +13,15 @@ import { createKernelSmartAccount, loginUserWithPassKey } from "../../passkey/pa
 import React, { useContext, useEffect } from "react";
 
 import {paymentWithSession, paymentWithPassKey}  from '../../passkey/blockPayments'
-import { createPublicClient, http } from "viem";
+import { createPublicClient, http, zeroAddress } from "viem";
 import { arbitrumSepolia, sepolia } from "viem/chains";
 import { AppContextCreator } from "../../appcontext";
-import { createZeroDevPaymasterClient } from "@zerodev/sdk";
+import { createKernelAccount, createZeroDevPaymasterClient } from "@zerodev/sdk";
 import { EntryPoint } from "permissionless/types";
 import { createMultiChainKernelAccountTWO, createMultichainValidatorTwoChain, prepareTransactionTWO, signUsers } from "../../multichain";
 import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from "permissionless"
+import { ValidatorType, WebAuthnMode, createKernelMultiChainClient, toMultiChainWebAuthnValidator, toWebAuthnKey, webauthnSignUserOps } from "@zerodev/multi-chain-validator";
+import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
 
 
 const getEntryPoint = (): EntryPoint => {
@@ -48,7 +50,7 @@ const ZERODEVPAYMASTERCLIENT = createZeroDevPaymasterClient({
 
 
 let PASSKEY_SERVER_ARB =
-  "https://passkeys.zerodev.app/api/v3/b1264e2d-1009-4cf3-8efd-9a677ba6470b";
+  "https://passkeys.zerodev.app/api/v3/80cd78f4-bc97-438e-8af5-319ad779c9f9";
 let BUNDLER_URL_ARB =
   "https://rpc.zerodev.app/api/v2/bundler/80cd78f4-bc97-438e-8af5-319ad779c9f9";
 let PAYMASTER_URL_ARB =
@@ -61,7 +63,7 @@ let clientInstanceARB = createPublicClient({
 
 const ZERODEVPAYMASTERCLIENT_ARB =  createZeroDevPaymasterClient({
     chain: arbitrumSepolia,
-    transport: http(BUNDLER_URL_ARB),
+    transport: http(PAYMASTER_URL_ARB),
     entryPoint: getEntryPoint()
 })
 
@@ -180,53 +182,183 @@ window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define
 
   async function multiChainSignTx() {
     console.log('creating ....')
-    let validators = await createMultichainValidatorTwoChain()
-    console.log('this is multi chain ', validators)
-    console.log('sepolia ', validators[0])
-    console.log('arbSepolia ', validators[1])
+    // let validators = await createMultichainValidatorTwoChain()
+    const webAuthnKey = await toWebAuthnKey({
+      passkeyName: "ITL-passKey-Demo",
+      passkeyServerUrl: PASSKEY_SERVER_URL,
+      mode: WebAuthnMode.Login
+  })
+
+  console.log("WebAuthnKey: ", webAuthnKey)
+
+  const sepoliaMultiChainWebAuthnValidator =
+      await toMultiChainWebAuthnValidator(clientInstance, {
+          passkeyServerUrl: PASSKEY_SERVER_URL,
+          webAuthnKey,
+          entryPoint: ENTRYPOINT_ADDRESS_V07,
+          kernelVersion:KERNEL_V3_1
+      })
+
+  const ARBtirumSepoliaMultiChainWebAuthnValidator =
+      await toMultiChainWebAuthnValidator(clientInstanceARB, {
+          passkeyServerUrl: PASSKEY_SERVER_ARB,
+          webAuthnKey,
+          entryPoint: ENTRYPOINT_ADDRESS_V07,
+          kernelVersion:KERNEL_V3_1
+      })
+
+
+      
+    // console.log('this is multi chain ', validators)
+    console.log('sepolia ', sepoliaMultiChainWebAuthnValidator)
+    console.log('arbSepolia ', ARBtirumSepoliaMultiChainWebAuthnValidator)
 
 
     console.log('createing Accounts .....')
 
-    let multichainAccounts = await createMultiChainKernelAccountTWO(validators)
+    const sepoliaKernelAccount = await createKernelAccount(clientInstance, {
+      entryPoint: getEntryPoint(),
+      plugins: {
+          sudo: sepoliaMultiChainWebAuthnValidator
+      },
+      kernelVersion:KERNEL_V3_1
+  })
 
-    console.log('createing multichainAccounts .....', multichainAccounts)
+  const ARBSepoliaKernelAccount = await createKernelAccount(
+      clientInstanceARB,
+      {
+          entryPoint: getEntryPoint(),
+          plugins: {
+              sudo: ARBtirumSepoliaMultiChainWebAuthnValidator
+          },
+      kernelVersion:KERNEL_V3_1
+
+      }
+  )
+
+  if (sepoliaKernelAccount.address !== ARBSepoliaKernelAccount.address) {
+      throw new Error("Addresses do not match")
+  }
+
+  const sepoliaKernelClient = createKernelMultiChainClient({
+      account: sepoliaKernelAccount,
+      chain: sepolia,
+      bundlerTransport: http(BUNDLER_URL),
+      entryPoint: getEntryPoint(),
+      middleware: {
+          sponsorUserOperation: async ({ userOperation }) => {
+              return ZERODEVPAYMASTERCLIENT.sponsorUserOperation({
+                  userOperation,
+                  entryPoint: getEntryPoint()
+              })
+          }
+      }
+  })
+
+  const ARBSepoliaKernelClient = createKernelMultiChainClient({
+      account: ARBSepoliaKernelAccount,
+      chain: arbitrumSepolia,
+      bundlerTransport: http(BUNDLER_URL_ARB),
+      entryPoint: getEntryPoint(),
+      middleware: {
+          sponsorUserOperation: async ({ userOperation }) => {
+              return ZERODEVPAYMASTERCLIENT_ARB.sponsorUserOperation(
+                  {
+                      userOperation,
+                      entryPoint: getEntryPoint()
+                  }
+              )
+          }
+      }
+  })
+
+    // let multichainAccounts = await createMultiChainKernelAccountTWO(validators)
+
+    console.log('createing multichainAccounts .....')
+    console.log('preparing transaction ......')
+
+    const sepoliaUserOp =
+    await sepoliaKernelClient.prepareMultiUserOpRequest(
+        {
+            userOperation: {
+                callData: await sepoliaKernelAccount.encodeCallData({
+                    to: zeroAddress,
+                    value: BigInt(0),
+                    data: "0x"
+                })
+            }
+        },
+        ValidatorType.WEBAUTHN,
+        2
+    )
+
+const arbSepoliaUserops =
+    await ARBSepoliaKernelClient.prepareMultiUserOpRequest(
+        {
+            userOperation: {
+                callData: await ARBSepoliaKernelAccount.encodeCallData({
+                    to: zeroAddress,
+                    value: BigInt(0),
+                    data: "0x"
+                })
+            }
+        },
+        ValidatorType.WEBAUTHN,
+        2
+    )
+
+    console.log('this is my user ops sepolia ', sepoliaUserOp)
+    console.log('this is my user ops sepolia ', arbSepoliaUserops)
 
 
-    let transactionA = await prepareTransactionTWO(multichainAccounts.ARBSepoliaKernelClient, multichainAccounts.ARBSepoliaKernelAccount)
-    console.log('transactionA signed ....', transactionA)
-    let transactionB = await prepareTransactionTWO(multichainAccounts.sepoliaKernelClient, multichainAccounts.sepoliaKernelAccount)
-    console.log('transaction B signed .....', transactionB)
+    // let transactionA = await prepareTransactionTWO(multichainAccounts.ARBSepoliaKernelClient, multichainAccounts.ARBSepoliaKernelAccount)
+    // console.log('transactionA signed ....', transactionA)
+    // let transactionB = await prepareTransactionTWO(multichainAccounts.sepoliaKernelClient, multichainAccounts.sepoliaKernelAccount)
+    // console.log('transaction B signed .....', transactionB)
 
 
-    let signingTx = await signUsers(multichainAccounts.sepoliaKernelAccount, transactionB.transactionOps, transactionA.transactionOps )
-    console.log('thsi is the signed jointed TX ', signingTx)
+
+    const signedUserOps = await webauthnSignUserOps({
+      account: sepoliaKernelAccount,
+      multiUserOps: [
+          { userOperation: sepoliaUserOp, chainId: sepolia.id },
+          {
+              userOperation:arbSepoliaUserops,
+              chainId: arbitrumSepolia.id
+          }
+      ],
+      entryPoint: getEntryPoint()
+  })
+    // let signingTx = await signUsers(multichainAccounts.sepoliaKernelAccount, transactionB.transactionOps, transactionA.transactionOps )
+    console.log('thsi is the signed jointed TX ', signedUserOps)
   // let transactionb = await prepareTransactionTWO(multichainAccounts. )
   // multichainAccounts.ARBSepoliaKernelAccount
 
 
-//   const ARB_new_sepoliaBundlerClient =multichainAccounts.ARBSepoliaKernelClient.extend(
-//     bundlerActions(ENTRYPOINT_ADDRESS_V07)
-// )
+  const ARB_new_sepoliaBundlerClient =ARBSepoliaKernelClient.extend(
+    bundlerActions(ENTRYPOINT_ADDRESS_V07)
+)
 
 
-// const new_sepoliaBundlerClient =multichainAccounts.sepoliaKernelClient.extend(
-//   bundlerActions(ENTRYPOINT_ADDRESS_V07)
-// )
-//   console.warn('we should not get a prompt for signning ???????', signingTx.signedUserOps[0])
-//   let submitTransactonsA = await new_sepoliaBundlerClient.sendUserOperation({
-//     userOperation: signingTx.signedUserOps[0]
-// })
+const new_sepoliaBundlerClient =sepoliaKernelClient.extend(
+  bundlerActions(ENTRYPOINT_ADDRESS_V07)
+)
+  console.warn('we should not get a prompt for signning ???????', signedUserOps[0])
+  let submitTransactonsA = await new_sepoliaBundlerClient.sendUserOperation({
+    userOperation: signedUserOps[0]
+})
 
-// console.log('this is the submitted Tx ', submitTransactonsA)
+console.log('this is the submitted Tx ', submitTransactonsA)
 
 
-// console.warn('we should not get a prompt for signning ???????', signingTx.signedUserOps[1])
-// let submitTransactonsB = await ARB_new_sepoliaBundlerClient.sendUserOperation({
-//   userOperation: signingTx.signedUserOps[1]
-// })
+console.warn('we should not get a prompt for signning ???????', signedUserOps[1])
+let submitTransactonsB = await ARB_new_sepoliaBundlerClient.sendUserOperation({
+  userOperation: signedUserOps[1]
 
-// console.log('this is the submitted Tx ', submitTransactonsB)
+})
+
+console.log('this is the submitted Tx ', submitTransactonsB)
+console.warn('end of tx ........')
     
   }
 
