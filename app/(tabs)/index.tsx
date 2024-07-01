@@ -82,6 +82,8 @@ export default function HomeScreen() {
   const [publicClient, setPublicClient] = React.useState<any>(clientInstance)
   const [sessionAccount, setSessionAccount] = React.useState<any | undefined>(undefined)
   const [sessionClient, setSessionClient] = React.useState<any | undefined>(undefined)
+  const [arbBundler, setArbBundler] = React.useState<any | undefined>(undefined)
+  const [arbUserOps, setArbUserOps] = React.useState<any | undefined>(undefined)
 
 window.Buffer = window.Buffer || Buffer;  // used for handling buffer not define error
 
@@ -339,6 +341,8 @@ const arbSepoliaUserops =
     bundlerActions(ENTRYPOINT_ADDRESS_V07)
 )
 
+setArbBundler(ARB_new_sepoliaBundlerClient)
+
 
 const new_sepoliaBundlerClient =sepoliaKernelClient.extend(
   bundlerActions(ENTRYPOINT_ADDRESS_V07)
@@ -351,13 +355,14 @@ const new_sepoliaBundlerClient =sepoliaKernelClient.extend(
 console.log('this is the submitted Tx ', submitTransactonsA)
 
 
-console.warn('we should not get a prompt for signning ???????', signedUserOps[1])
-let submitTransactonsB = await ARB_new_sepoliaBundlerClient.sendUserOperation({
-  userOperation: signedUserOps[1]
+// console.warn('we should not get a prompt for signning ???????', signedUserOps[1])
+// let submitTransactonsB = await ARB_new_sepoliaBundlerClient.sendUserOperation({
+//   userOperation: signedUserOps[1]
 
-})
+// })
+setArbUserOps(signedUserOps[1])
 
-console.log('this is the submitted Tx ', submitTransactonsB)
+// console.log('this is the submitted Tx ', submitTransactonsB)
 console.warn('end of tx ........')
     
   }
@@ -369,6 +374,18 @@ console.warn('end of tx ........')
     
   }
 
+
+  async function submitArbTransac() {
+    console.warn('submitting -----', arbUserOps)
+    console.log('no sig, just submit ')
+let submitTransactonsB = await arbBundler.sendUserOperation({
+  userOperation: arbUserOps
+
+})
+
+console.log('args ', submitTransactonsB)
+    
+  }
  
      
 
@@ -428,6 +445,12 @@ console.warn('end of tx ........')
 
         <ThemedText>
         <Button  onPress={handleMultiChainCreateAcct} title="create Multis-chain new Account" color="red" />
+
+        </ThemedText>
+
+
+        <ThemedText>
+        <Button  onPress={submitArbTransac} title="Submited Arb transaction " color="green" />
 
         </ThemedText>
       
