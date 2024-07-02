@@ -150,6 +150,11 @@ export default function HomeScreen() {
   const [sepoliaUserOps, setSepoliaUserOps] =
     React.useState<UserOperation<any>>();
 
+
+    const [signedUserOperations, setSignedUserOperations] =
+    React.useState<UserOperation<any>>();
+    const [transactionSigned, setTransactionSigned] = React.useState<boolean>(false)
+
   window.Buffer = window.Buffer || Buffer; // used for handling buffer not define error
 
   async function handleBTN() {
@@ -356,7 +361,31 @@ export default function HomeScreen() {
       ],
       entryPoint: getEntryPoint(),
     });
+
     return signedUserOps;
+  }
+
+  async function submitAbteriumTransaction() {
+    console.log("the  signedUserOperations[1]  tex ",  signedUserOperations![1]);
+    let tx1 = await arbBundler.sendUserOperation({
+      userOperation: signedUserOperations![1],
+    });
+
+    console.log(tx1)
+
+    
+  }
+
+
+  async function submitSepoliaTransaction() {
+    console.log("the  signedUserOperations[1]  tex ",  signedUserOperations![0]);
+    let tx1 = await sepoliaBundler.sendUserOperation({
+      userOperation: signedUserOperations![0],
+    });
+
+    console.log(tx1)
+
+    
   }
 
   async function multiChainSignTx() {
@@ -504,6 +533,7 @@ export default function HomeScreen() {
   // }
 
   async function signAndSubmitTx() {
+    console.log('got inside ')
     let signedUserOps = await signTransactions(
       sepoliaKernelAccount,
       sepoliaUserOps as UserOperation<any>,
@@ -512,18 +542,21 @@ export default function HomeScreen() {
       arbitrumSepolia.id
     );
 
-    console.log("the sigjed  tex ", signedUserOps);
-    let tx1 = await arbBundler.sendUserOperation({
-      userOperation: signedUserOps[1],
-    });
+    setSignedUserOperations(signedUserOps)
+    setTransactionSigned(true)
 
-    console.log("user ops 1 ", tx1);
+    // console.log("the sigjed  tex ", signedUserOps);
+    // let tx1 = await arbBundler.sendUserOperation({
+    //   userOperation: signedUserOps[1],
+    // });
 
-    let tx2 = await sepoliaBundler.sendUserOperation({
-      userOperation: signedUserOps[0],
-    });
+    // console.log("user ops 1 ", tx1);
 
-    console.log("tx2 ..", tx2);
+    // let tx2 = await sepoliaBundler.sendUserOperation({
+    //   userOperation: signedUserOps[0],
+    // });
+
+    // console.log("tx2 ..", tx2);
   }
 
   return (
@@ -542,8 +575,8 @@ export default function HomeScreen() {
 
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Pass key start Here</ThemedText>
-        <ThemedText>
-          <Button
+        {/* <ThemedText> */}
+          {/* <Button
             disabled={loading}
             onPress={handleBTN}
             title="Register new pass Key"
@@ -589,12 +622,12 @@ export default function HomeScreen() {
             title="Send ARB Transaction"
             color="red"
           />
-        </ThemedText>
+        </ThemedText> */}
 
         <ThemedText>
           <Button
             onPress={multiChainSignTx}
-            title="create Multis-chain signed transaction"
+            title="Login "
             color="red"
           />
         </ThemedText>
@@ -615,14 +648,62 @@ export default function HomeScreen() {
           />
         </ThemedText> */}
 
+        {/* <ThemedText>
+          <Button
+            onPress={signAndSubmitTx}
+            title="signAndSubmitTransaction "
+            color="grey"
+          />
+        </ThemedText> */}
+
+
+
+
+        
         <ThemedText>
           <Button
             onPress={signAndSubmitTx}
-            title="signTransaction "
-            color="grey"
+            title="sign Transaction "
+            color="#841584"
+
+          />
+        </ThemedText>
+
+        {/* <ThemedText>
+          <Button
+            onPress={signAndSubmitTx}
+            title="submit signed Transaction "
+            color="#841584"
+
+          />
+        </ThemedText> */}
+
+
+        
+        <ThemedText>
+          <Button
+          disabled={!transactionSigned}
+            onPress={submitAbteriumTransaction}
+            title="submit signed arbitrum transaction "
+            color="#841584"
+
+          />
+        </ThemedText>
+
+        
+        <ThemedText>
+          <Button
+           disabled={!transactionSigned}
+            onPress={submitSepoliaTransaction}
+            title="submit signed Sepolia Transaction "
+            color="#841584"
+
           />
         </ThemedText>
       </ThemedView>
+
+
+      
     </ParallaxScrollView>
   );
 }

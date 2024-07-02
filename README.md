@@ -48,3 +48,28 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+
+
+
+
+
+- User login/signup and their webauthn key is return
+- the webauthn n key is used to create a multichain validator for all cupported chain
+- the toMultiChainWebAuthnValidator is used to create an account on all supported chain
+- use the kernelAccount gotten so far to create a kernelclient and store locally using state
+
+
+Sending Transaction
+- the client is used to prepareMultiUserOpRequest for each chain and for different transaction we need to submit
+- all transactions are gathered and send to the user for signing using webauthnSignUserOps
+- once transaction has been signed, the transaction can be submitted at any time
+
+
+
+
+Creating session Key
+- swap from sepolia
+- Bridge Asset from sepolia to ARB
+- Submit a stake tx on ARB
+
