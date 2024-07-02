@@ -35,35 +35,23 @@ import {
   http,
   zeroAddress,
 } from "viem";
-import { arbitrumSepolia, sepolia } from "viem/chains";
+import { arbitrumSepolia, sepolia, optimismSepolia } from "viem/chains";
 import { AppContextCreator } from "../../appcontext";
 import {
   KernelSmartAccount,
-  KernelValidator,
-  ZeroDevPaymasterClient,
-  createKernelAccount,
   createZeroDevPaymasterClient,
 } from "@zerodev/sdk";
 import { EntryPoint, UserOperation } from "permissionless/types";
-import {
-  createMultiChainKernelAccountTWO,
-  createMultichainValidatorTwoChain,
-  prepareTransactionTWO,
-  signUsers,
-} from "../../multichain";
+;
 import { bundlerActions, ENTRYPOINT_ADDRESS_V07 } from "permissionless";
 import {
   KernelMultiChainClient,
-  MultiChainUserOperation,
-  ValidatorType,
   WebAuthnMode,
-  createKernelMultiChainClient,
-  toMultiChainWebAuthnValidator,
   toWebAuthnKey,
   webauthnSignUserOps,
 } from "@zerodev/multi-chain-validator";
-import { KERNEL_V3_1 } from "@zerodev/sdk/constants";
-import { WebAuthnKey } from "@zerodev/passkey-validator/_types/toWebAuthnKey";
+import { createKernelMultiChainAccount, createMultiChainClient, createMultiChainValidator, encodeMultiChainTransaction } from "../../multichain";
+import { encodeCrossChainTransaction } from "../../others";
 
 const getEntryPoint = (): EntryPoint => {
   return ENTRYPOINT_ADDRESS_V07;
@@ -90,21 +78,21 @@ const ZERODEVPAYMASTERCLIENT = createZeroDevPaymasterClient({
 });
 
 let PASSKEY_SERVER_ARB =
-  "https://passkeys.zerodev.app/api/v3/80cd78f4-bc97-438e-8af5-319ad779c9f9";
+  "https://passkeys.zerodev.app/api/v3/630baab0-aea8-4ab8-bc94-90733406de58";
 let BUNDLER_URL_ARB =
-  "https://rpc.zerodev.app/api/v2/bundler/80cd78f4-bc97-438e-8af5-319ad779c9f9";
+  "https://rpc.zerodev.app/api/v2/bundler/630baab0-aea8-4ab8-bc94-90733406de58";
 let PAYMASTER_URL_ARB =
-  "https://rpc.zerodev.app/api/v2/paymaster/80cd78f4-bc97-438e-8af5-319ad779c9f9";
+  "https://rpc.zerodev.app/api/v2/paymaster/630baab0-aea8-4ab8-bc94-90733406de58";
 let defaultChainARB = arbitrumSepolia;
 
 let clientInstanceARB = createPublicClient({
   transport: http(
-    "https://rpc.ankr.com/arbitrum_sepolia/88d8da7367895a23352a6910b06ef6f526b8b82b22f2dc62acd2c0266946510a"
+    "https://rpc.ankr.com/optimism_sepolia/88d8da7367895a23352a6910b06ef6f526b8b82b22f2dc62acd2c0266946510a"
   ),
 });
 
 const ZERODEVPAYMASTERCLIENT_ARB = createZeroDevPaymasterClient({
-  chain: arbitrumSepolia,
+  chain: optimismSepolia,
   transport: http(PAYMASTER_URL_ARB),
   entryPoint: getEntryPoint(),
 });
@@ -154,194 +142,200 @@ export default function HomeScreen() {
     const [signedUserOperations, setSignedUserOperations] =
     React.useState<UserOperation<any>>();
     const [transactionSigned, setTransactionSigned] = React.useState<boolean>(false)
+    const [isLoggedIn, setIsLoggedIn] = React.useState<boolean>(false)
+
+
+    const [sepoliaAccountKernel, setSepoliaAccountKernel] = React.useState<any>(
+      undefined
+    );
 
   window.Buffer = window.Buffer || Buffer; // used for handling buffer not define error
 
-  async function handleBTN() {
-    setLoading(true);
-    console.log("wporking ");
-    let passVal = await registerNewPassKey();
+  // async function handleBTN() {
+  //   setLoading(true);
+  //   console.log("wporking ");
+  //   let passVal = await registerNewPassKey();
 
-    // console.log('pass key validatoe ', passVal)
-    // console.log('pass key validatoe ', passVal.passkeyValidator, 'address')
-    // let session = await createSmartAccountWithSessionKey(passVal.passkeyValidator)
-    // console.warn('this is seeion ', session)
-    setLoading(false);
-  }
+  //   // console.log('pass key validatoe ', passVal)
+  //   // console.log('pass key validatoe ', passVal.passkeyValidator, 'address')
+  //   // let session = await createSmartAccountWithSessionKey(passVal.passkeyValidator)
+  //   // console.warn('this is seeion ', session)
+  //   setLoading(false);
+  // }
 
-  async function handleLogin() {
-    setLoading(true);
-    // let det = await createAccountClientWithPassKey()
-    // console.warn('det ', det)
+  // async function handleLogin() {
+  //   setLoading(true);
+  //   // let det = await createAccountClientWithPassKey()
+  //   // console.warn('det ', det)
 
-    console.log("wporking login");
-    let passVal = await loginUserWithPassKey(PASSKEY_SERVER_URL);
-    context?.setValidatorInstance(passVal.webAuthnKey);
-    setPassKeyInstance(passVal.webAuthnKey);
+  //   console.log("wporking login");
+  //   let passVal = await loginUserWithPassKey(PASSKEY_SERVER_URL);
+  //   context?.setValidatorInstance(passVal.webAuthnKey);
+  //   setPassKeyInstance(passVal.webAuthnKey);
 
-    let pValidator = await createValidator(
-      passVal.webAuthnKey,
-      publicClient,
-      PASSKEY_SERVER_URL
-    );
-    setPassKeyValidator(pValidator);
+  //   let pValidator = await createValidator(
+  //     passVal.webAuthnKey,
+  //     publicClient,
+  //     PASSKEY_SERVER_URL
+  //   );
+  //   setPassKeyValidator(pValidator);
 
-    let kernelAccount = await createKernelSmartAccount(
-      pValidator,
-      publicClient
-    );
+  //   let kernelAccount = await createKernelSmartAccount(
+  //     pValidator,
+  //     publicClient
+  //   );
 
-    console.log("kernalAccount ", kernelAccount);
-    setSmartAccountInstance(kernelAccount);
+  //   console.log("kernalAccount ", kernelAccount);
+  //   setSmartAccountInstance(kernelAccount);
 
-    let requestClient = await createRequestClient(
-      kernelAccount,
-      BUNDLER_URL,
-      PAYMASTER_URL,
-      defaultChain
-    );
-    setRequestClient(requestClient);
+  //   let requestClient = await createRequestClient(
+  //     kernelAccount,
+  //     BUNDLER_URL,
+  //     PAYMASTER_URL,
+  //     defaultChain
+  //   );
+  //   setRequestClient(requestClient);
 
-    console.log("pass key validatoe ", passVal);
-    // console.log('pass key validatoe ', passVal.passkeyValidator, 'address')
-    // let session = await createSmartAccountWithSessionKey(passVal.passkeyValidator)
-    // console.warn('this is seeion ', session)
-    setLoading(false);
-  }
+  //   console.log("pass key validatoe ", passVal);
+  //   // console.log('pass key validatoe ', passVal.passkeyValidator, 'address')
+  //   // let session = await createSmartAccountWithSessionKey(passVal.passkeyValidator)
+  //   // console.warn('this is seeion ', session)
+  //   setLoading(false);
+  // }
 
-  async function handleSendPaymentPass() {
-    console.log("handleSendPaymentPass");
-    console.log("this is validator ", passKeyValidator);
-    let paymentRequest = await sendUserOperationPayment(
-      requestClient,
-      smartAccountInstance
-    );
-    console.log("this pass account ", paymentRequest);
-  }
+  // async function handleSendPaymentPass() {
+  //   console.log("handleSendPaymentPass");
+  //   console.log("this is validator ", passKeyValidator);
+  //   let paymentRequest = await sendUserOperationPayment(
+  //     requestClient,
+  //     smartAccountInstance
+  //   );
+  //   console.log("this pass account ", paymentRequest);
+  // }
 
-  async function handleCreateSession() {
-    console.log("createSession");
-    let sessionCreated = await createSessionKeyAccount(
-      passKeyValidator,
-      publicClient
-    );
-    setSessionAccount(sessionCreated);
-    console.log("this is the seesion ", sessionCreated);
+  // async function handleCreateSession() {
+  //   console.log("createSession");
+  //   let sessionCreated = await createSessionKeyAccount(
+  //     passKeyValidator,
+  //     publicClient
+  //   );
+  //   setSessionAccount(sessionCreated);
+  //   console.log("this is the seesion ", sessionCreated);
 
-    let requestClient2 = await createRequestClient(
-      sessionCreated,
-      BUNDLER_URL,
-      PAYMASTER_URL,
-      defaultChain
-    );
-    setSessionClient(requestClient2);
+  //   let requestClient2 = await createRequestClient(
+  //     sessionCreated,
+  //     BUNDLER_URL,
+  //     PAYMASTER_URL,
+  //     defaultChain
+  //   );
+  //   setSessionClient(requestClient2);
 
-    console.log("session created ", requestClient2);
-  }
+  //   console.log("session created ", requestClient2);
+  // }
 
-  async function sendArbTransaction() {
-    console.log("sendArbTransaction");
+  // async function sendArbTransaction() {
+  //   console.log("sendArbTransaction");
 
-    let requestClient = await createRequestClient(
-      smartAccountInstance,
-      BUNDLER_URL_ARB,
-      PAYMASTER_URL_ARB,
-      defaultChainARB
-    );
+  //   let requestClient = await createRequestClient(
+  //     smartAccountInstance,
+  //     BUNDLER_URL_ARB,
+  //     PAYMASTER_URL_ARB,
+  //     defaultChainARB
+  //   );
 
-    console.warn("created client ...");
+  //   console.warn("created client ...");
 
-    let paymentRequest = await sendUserOperationPayment(
-      requestClient,
-      smartAccountInstance
-    );
-    console.log("this pass account ", paymentRequest);
-  }
+  //   let paymentRequest = await sendUserOperationPayment(
+  //     requestClient,
+  //     smartAccountInstance
+  //   );
+  //   console.log("this pass account ", paymentRequest);
+  // }
 
-  async function handleSendPaymentSession() {
-    console.log("handleSendPaymentSession");
-    let paymentRequest = await sendUserOperationPayment(
-      sessionClient,
-      sessionAccount
-    );
-    console.log("this pass account ", paymentRequest);
-  }
+  // async function handleSendPaymentSession() {
+  //   console.log("handleSendPaymentSession");
+  //   let paymentRequest = await sendUserOperationPayment(
+  //     sessionClient,
+  //     sessionAccount
+  //   );
+  //   console.log("this pass account ", paymentRequest);
+  // }
 
-  async function createMultiChainValidator(
-    lPublicClient: PublicClient,
-    passkeyUrl: string,
-    webauthInstance: WebAuthnKey
-  ) {
-    let validator = await toMultiChainWebAuthnValidator(lPublicClient, {
-      passkeyServerUrl: passkeyUrl,
-      webAuthnKey: webauthInstance,
-      entryPoint: ENTRYPOINT_ADDRESS_V07,
-      kernelVersion: KERNEL_V3_1,
-    });
+  // async function createMultiChainValidator(
+  //   lPublicClient: PublicClient,
+  //   passkeyUrl: string,
+  //   webauthInstance: WebAuthnKey
+  // ) {
+  //   let validator = await toMultiChainWebAuthnValidator(lPublicClient, {
+  //     passkeyServerUrl: passkeyUrl,
+  //     webAuthnKey: webauthInstance,
+  //     entryPoint: ENTRYPOINT_ADDRESS_V07,
+  //     kernelVersion: KERNEL_V3_1,
+  //   });
 
-    return validator;
-  }
+  //   return validator;
+  // }
 
-  async function createKernelMultiChainAccount(
-    lPublicClient: PublicClient,
-    chainValidator: KernelValidator<any>
-  ) {
-    let lKernelAccount = await createKernelAccount(lPublicClient, {
-      entryPoint: getEntryPoint(),
-      plugins: {
-        sudo: chainValidator,
-      },
-      kernelVersion: KERNEL_V3_1,
-    });
+  // async function createKernelMultiChainAccount(
+  //   lPublicClient: PublicClient,
+  //   chainValidator: KernelValidator<any>
+  // ) {
+  //   let lKernelAccount = await createKernelAccount(lPublicClient, {
+  //     entryPoint: getEntryPoint(),
+  //     plugins: {
+  //       sudo: chainValidator,
+  //     },
+  //     kernelVersion: KERNEL_V3_1,
+  //   });
 
-    return lKernelAccount;
-  }
+  //   return lKernelAccount;
+  // }
 
-  async function createMultiChainClient(
-    lKernelAccount: KernelSmartAccount<any>,
-    chain: Chain,
-    bundlerUrl: string,
-    zerodevPaymasterInstane: ZeroDevPaymasterClient<any>
-  ) {
-    let lChainClient = await createKernelMultiChainClient({
-      account: lKernelAccount,
-      chain: chain,
-      bundlerTransport: http(bundlerUrl),
-      entryPoint: getEntryPoint(),
-      middleware: {
-        sponsorUserOperation: async ({ userOperation }) => {
-          return zerodevPaymasterInstane.sponsorUserOperation({
-            userOperation,
-            entryPoint: getEntryPoint(),
-          });
-        },
-      },
-    });
+  // async function createMultiChainClient(
+  //   lKernelAccount: KernelSmartAccount<any>,
+  //   chain: Chain,
+  //   bundlerUrl: string,
+  //   zerodevPaymasterInstane: ZeroDevPaymasterClient<any>
+  // ) {
+  //   let lChainClient = await createKernelMultiChainClient({
+  //     account: lKernelAccount,
+  //     chain: chain,
+  //     bundlerTransport: http(bundlerUrl),
+  //     entryPoint: getEntryPoint(),
+  //     middleware: {
+  //       sponsorUserOperation: async ({ userOperation }) => {
+  //         return zerodevPaymasterInstane.sponsorUserOperation({
+  //           userOperation,
+  //           entryPoint: getEntryPoint(),
+  //         });
+  //       },
+  //     },
+  //   });
 
-    return lChainClient;
-  }
+  //   return lChainClient;
+  // }
 
-  async function encodeMultiChainTransaction(
-    lKernelClient: KernelMultiChainClient<any>,
-    lKernelAccount: KernelSmartAccount<any>,
-    numberOfUserOps: number
-  ) {
-    let lTransaction = await lKernelClient.prepareMultiUserOpRequest(
-      {
-        userOperation: {
-          callData: await lKernelAccount.encodeCallData({
-            to: zeroAddress,
-            value: BigInt(0),
-            data: "0x",
-          }),
-        },
-      },
-      ValidatorType.WEBAUTHN,
-      numberOfUserOps
-    );
+  // async function encodeMultiChainTransaction(
+  //   lKernelClient: KernelMultiChainClient<any>,
+  //   lKernelAccount: KernelSmartAccount<any>,
+  //   numberOfUserOps: number
+  // ) {
+  //   let lTransaction = await lKernelClient.prepareMultiUserOpRequest(
+  //     {
+  //       userOperation: {
+  //         callData: await lKernelAccount.encodeCallData({
+  //           to: zeroAddress,
+  //           value: BigInt(0),
+  //           data: "0x",
+  //         }),
+  //       },
+  //     },
+  //     ValidatorType.WEBAUTHN,
+  //     numberOfUserOps
+  //   );
 
-    return lTransaction;
-  }
+  //   return lTransaction;
+  // }
 
   async function signTransactions(
     sourceAccount: KernelSmartAccount<any>,
@@ -388,6 +382,34 @@ export default function HomeScreen() {
     
   }
 
+
+
+  async function signMultiChainTx() {
+    console.log('got inside ')
+    let signedUserOps = await signTransactions(
+      sepoliaKernelAccount,
+      sepoliaUserOps as UserOperation<any>,
+      sepolia.id,
+      arbUserOps as UserOperation<any>,
+      optimismSepolia.id
+    );
+
+    setSignedUserOperations(signedUserOps as any)
+    // setTransactionSigned(true)
+  }
+
+
+  async function submitMultiChainSepoliaAcct() {
+    console.log("the  signedUserOperations[1]  tex ",  signedUserOperations);
+    let tx1 = await sepoliaBundler.sendUserOperation({
+      userOperation: signedUserOperations,
+    });
+
+    console.log(tx1)
+  }
+
+  
+
   async function multiChainSignTx() {
     console.log("creating ....");
     // let validators = await createMultichainValidatorTwoChain()
@@ -430,6 +452,9 @@ export default function HomeScreen() {
       throw new Error("Addresses do not match");
     }
 
+    console.log('this is the sepolia kernel account ', sepoliaKernelAccount)
+    setSepoliaAccountKernel(sepoliaKernelAccount)
+
     sepoliaKernelClient = await createMultiChainClient(
       sepoliaKernelAccount,
       sepolia,
@@ -439,19 +464,25 @@ export default function HomeScreen() {
 
     ARBSepoliaKernelClient = await createMultiChainClient(
       ARBSepoliaKernelAccount,
-      arbitrumSepolia,
+      optimismSepolia,
       BUNDLER_URL_ARB,
       ZERODEVPAYMASTERCLIENT_ARB
     );
 
-    console.log("createing multichainAccounts .....");
+    console.log("createing multichainAccounts .....", sepoliaKernelClient);
     console.log("preparing transaction ......");
 
-    const sepoliaUserOp = await encodeMultiChainTransaction(
-      sepoliaKernelClient,
+    const sepoliaUserOp = await encodeCrossChainTransaction(sepoliaKernelClient,
       sepoliaKernelAccount,
-      2
-    );
+      2)
+    
+    
+    
+    // await encodeMultiChainTransaction(
+    //   sepoliaKernelClient,
+    //   sepoliaKernelAccount,
+    //   2
+    // );
 
     const arbSepoliaUserops = await encodeMultiChainTransaction(
       ARBSepoliaKernelClient,
@@ -463,6 +494,8 @@ export default function HomeScreen() {
     console.log("this is my user ops sepolia ", arbSepoliaUserops);
     setSepoliaUserOps(sepoliaUserOp);
     setArbUserOps(arbSepoliaUserops);
+
+    setIsLoggedIn(true)
 
     // let transactionA = await prepareTransactionTWO(multichainAccounts.ARBSepoliaKernelClient, multichainAccounts.ARBSepoliaKernelAccount)
     // console.log('transactionA signed ....', transactionA)
@@ -539,24 +572,50 @@ export default function HomeScreen() {
       sepoliaUserOps as UserOperation<any>,
       sepolia.id,
       arbUserOps as UserOperation<any>,
-      arbitrumSepolia.id
+      optimismSepolia.id
     );
 
     setSignedUserOperations(signedUserOps)
     setTransactionSigned(true)
 
-    // console.log("the sigjed  tex ", signedUserOps);
-    // let tx1 = await arbBundler.sendUserOperation({
-    //   userOperation: signedUserOps[1],
-    // });
+    console.log("the sigjed  tex ", signedUserOps);
+    let tx1 = await arbBundler.sendUserOperation({
+      userOperation: signedUserOps[1],
+    });
 
-    // console.log("user ops 1 ", tx1);
+    console.log("user ops 1 ", tx1);
 
-    // let tx2 = await sepoliaBundler.sendUserOperation({
-    //   userOperation: signedUserOps[0],
-    // });
+    let tx2 = await sepoliaBundler.sendUserOperation({
+      userOperation: signedUserOps[0],
+    });
 
-    // console.log("tx2 ..", tx2);
+    console.log("tx2 ..", tx2);
+  }
+
+
+  // async function submitMultiChainTx() {
+  //   let tx1 = await sepoliaBundler.sendUserOperation({
+  //     userOperation: signedUserOperations,
+  //   });
+
+  //   console.log(tx1)
+  // }
+
+  async function sendCrossChainTransaction(){
+    console.log('this is kernel account ', sepoliaBundler)
+    let cTransaction = await encodeCrossChainTransaction(
+      sepoliaBundler,
+      sepoliaKernelAccount,
+      1
+    )
+
+    console.log('this is the details ', cTransaction)
+    //signing
+    //submission
+
+    setSignedUserOperations(cTransaction)
+
+
   }
 
   return (
@@ -662,6 +721,7 @@ export default function HomeScreen() {
         
         <ThemedText>
           <Button
+          disabled={!isLoggedIn}
             onPress={signAndSubmitTx}
             title="sign Transaction "
             color="#841584"
@@ -684,7 +744,7 @@ export default function HomeScreen() {
           <Button
           disabled={!transactionSigned}
             onPress={submitAbteriumTransaction}
-            title="submit signed arbitrum transaction "
+            title="submit signed op sepolia transaction "
             color="#841584"
 
           />
@@ -700,6 +760,31 @@ export default function HomeScreen() {
 
           />
         </ThemedText>
+
+
+        <ThemedText>
+          <Button
+          disabled={!isLoggedIn}
+
+            onPress={sendCrossChainTransaction}
+            title="Get Across Quote | Sign "
+            color="yellowgreen"
+
+          />
+        </ThemedText>
+
+
+        
+        {/* <ThemedText>
+          <Button
+          disabled={!isLoggedIn}
+
+            onPress={submitMultiChainTx}
+            title="Submit multi chain "
+            color="yellowgreen"
+
+          />
+        </ThemedText> */}
       </ThemedView>
 
 

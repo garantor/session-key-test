@@ -1,5 +1,7 @@
 import { encodeFunctionData, parseUnits, zeroAddress } from "viem";
 import { BigNumber } from "ethers";
+import { KernelMultiChainClient, ValidatorType } from "@zerodev/multi-chain-validator";
+import { KernelSmartAccount } from "@zerodev/sdk";
 
 
 export const ERC20_APPROVAL = [
@@ -55,39 +57,47 @@ export async function getAcrossBridgeFees() {
 
 
 
-  export async function sendCrossChainTransfer({
-    sourceKernelAccount,
-  }: any) {
+  export async function encodeCrossChainTransaction(
+    lKernelClient: KernelMultiChainClient<any>,
+    lKernelAccount:KernelSmartAccount<any>,
+    numberOfUserOps:number
+) {
 
   
     //get bridging details
     let quoteResponse = await getAcrossBridgeFees()
 
+    console.log('this is quote reply ', quoteResponse)
+    console.log('this is quote reply ', quoteResponse.spokePoolAddress)
+    console.log('this is quote reply ', quoteResponse.totalRelayFee.total)
+    console.log('this is quote reply ', quoteResponse.timestamp)
 
-  
-    // encoding transaction for submission
-    const sendRequest = await sourceKernelAccount.account.encodeCallData([
+    let lTransaction = await lKernelClient.prepareMultiUserOpRequest(
       {
-        to: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-        data: encodeFunctionData({
-          abi: ERC20_APPROVAL,
-          functionName: "approve",
-          args: [
-            quoteResponse.spokePoolAddress,
-            2000000n,
-          ],
-        }),
-        value: BigInt(0),
-      },
-  
-      {
+        userOperation: {
+          callData: await lKernelAccount.encodeCallData([ 
+            {
+            to: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+            value: BigInt(0),
+            data: encodeFunctionData({
+              abi: ERC20_APPROVAL,
+              functionName: "approve",
+              args: [
+                quoteResponse.spokePoolAddress,
+                2000000n,
+              ],
+            }),
+          },
+        {
+
+
         to: quoteResponse.spokePoolAddress,
         data: encodeFunctionData({
           abi: DEPOSITV3_ABI,
           functionName: "depositV3",
           args: [
-            sourceKernelAccount.address,
-            sourceKernelAccount.address,
+            lKernelAccount.address,
+            lKernelAccount.address,
             '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
             zeroAddress,
             2000000,
@@ -103,16 +113,20 @@ export async function getAcrossBridgeFees() {
           ],
         }),
         value: BigInt(0),
+
+
+        }
+        
+        ]   
+        
+        
+        ),
+        },
       },
-    ]);
-  
-    // sending user transaction to the source chain, this will return hash
-    let pendingTransactions = await sourceKernelAccount.sendUserOperation({
-      userOperation: {
-        callData: sendRequest,
-      },
-    });
-  
-    return pendingTransactions;
+      ValidatorType.WEBAUTHN,
+      numberOfUserOps
+    );
+
+    return lTransaction
+
   }
-  
